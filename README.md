@@ -1,2 +1,2 @@
 # oncall-scheduler
-Job to schedule oncall shifts
+Tool to schedule oncall shifts
