@@ -1,4 +1,4 @@
-package cmd
+package report
 
 import (
 	"io"
@@ -6,14 +6,13 @@ import (
 
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
-	"github.com/giantswarm/oncall-scheduler/cmd/report"
-	"github.com/giantswarm/oncall-scheduler/cmd/schedule"
+	"github.com/giantswarm/oncall-scheduler/cmd/report/alert"
 	"github.com/spf13/cobra"
 )
 
 const (
-	name        = "oncall-scheduler"
-	description = "Tool to schedule oncall shifts"
+	name        = "report"
+	description = "Report on information"
 )
 
 type Config struct {
@@ -35,29 +34,15 @@ func New(config Config) (*cobra.Command, error) {
 
 	var err error
 
-	var reportCmd *cobra.Command
+	var alertCmd *cobra.Command
 	{
-		c := report.Config{
+		c := alert.Config{
 			Logger: config.Logger,
 			Stderr: config.Stderr,
 			Stdout: config.Stdout,
 		}
 
-		reportCmd, err = report.New(c)
-		if err != nil {
-			return nil, microerror.Mask(err)
-		}
-	}
-
-	var scheduleCmd *cobra.Command
-	{
-		c := schedule.Config{
-			Logger: config.Logger,
-			Stderr: config.Stderr,
-			Stdout: config.Stdout,
-		}
-
-		scheduleCmd, err = schedule.New(c)
+		alertCmd, err = alert.New(c)
 		if err != nil {
 			return nil, microerror.Mask(err)
 		}
@@ -73,16 +58,15 @@ func New(config Config) (*cobra.Command, error) {
 	}
 
 	c := &cobra.Command{
-		Use:          name,
-		Short:        description,
-		Long:         description,
-		RunE:         r.Run,
-		SilenceUsage: true,
+		Use:   name,
+		Short: description,
+		Long:  description,
+		RunE:  r.Run,
 	}
 
 	f.Init(c)
 
-	c.AddCommand(scheduleCmd)
+	c.AddCommand(alertCmd)
 
 	return c, nil
 }
