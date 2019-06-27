@@ -82,6 +82,7 @@ func New(config Config) (*cobra.Command, error) {
 
 	f.Init(c)
 
+	c.AddCommand(reportCmd)
 	c.AddCommand(scheduleCmd)
 
 	return c, nil
