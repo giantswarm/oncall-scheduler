@@ -1,0 +1,33 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: opsgenie-report
+  namespace: oncall-scheduler
+spec:
+  schedule: "0 6 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: opsgenie-report
+            image: quay.io/giantswarm/oncall-scheduler:latest
+            imagePullPolicy: Always
+            args:
+            - report
+            - alert
+            - --opsgenie-api-key=$(opsgenie-api-key)
+            - --slack-channel=test_bot
+            - --slack-token=$(slack-token)
+            env:
+            - name: opsgenie-api-key
+              valueFrom:
+                secretKeyRef:
+                  name: oncall-scheduler
+                  key: opsgenie-api-key
+            - name: slack-token
+              valueFrom:
+                secretKeyRef:
+                  name: oncall-scheduler
+                  key: slack-token
+          restartPolicy: Never
