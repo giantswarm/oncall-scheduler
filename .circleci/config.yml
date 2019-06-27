@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  build:
+  build-binary:
     docker:
       - image: quay.io/giantswarm/golang:1.12.6
     working_directory: /workdir
@@ -26,3 +26,38 @@ jobs:
           root: .
           paths:
             - ./oncall-scheduler
+  deploy-image:
+    docker:
+      - image: quay.io/giantswarm/docker:18.09.1
+    working_directory: /workdir
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run: |
+          docker version
+      - run: |
+          docker build --tag quay.io/giantswarm/oncall-scheduler:${CIRCLE_SHA1} .
+      - run: |
+          docker tag quay.io/giantswarm/oncall-scheduler:${CIRCLE_SHA1} quay.io/giantswarm/oncall-scheduler:latest
+      - run: |
+          docker run -i --rm --name oncall-scheduler --log-driver none quay.io/giantswarm/oncall-scheduler:${CIRCLE_SHA1}
+      - run: |
+          docker run -i --rm --name oncall-scheduler --log-driver none quay.io/giantswarm/oncall-scheduler:latest
+      - run: |
+          docker login -u ${QUAY_USERNAME} -p ${QUAY_PASSWORD} quay.io
+      - run: |
+          docker push quay.io/giantswarm/oncall-scheduler:${CIRCLE_SHA1}
+      - run: |
+          docker push quay.io/giantswarm/oncall-scheduler:latest
+
+workflows:
+  version: 2
+  build-and-deploy:
+    jobs:
+      - build-binary
+      - deploy-image:
+          requires:
+            - build-binary
