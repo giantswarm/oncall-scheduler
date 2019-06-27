@@ -1,4 +1,4 @@
-package report
+package shift
 
 import (
 	"io"
@@ -6,14 +6,12 @@ import (
 
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
-	"github.com/giantswarm/oncall-scheduler/cmd/report/alert"
-	"github.com/giantswarm/oncall-scheduler/cmd/report/shift"
 	"github.com/spf13/cobra"
 )
 
 const (
-	name        = "report"
-	description = "Report on information"
+	name        = "shift"
+	description = "Report on shifts"
 )
 
 type Config struct {
@@ -33,36 +31,6 @@ func New(config Config) (*cobra.Command, error) {
 		config.Stdout = os.Stdout
 	}
 
-	var err error
-
-	var alertCmd *cobra.Command
-	{
-		c := alert.Config{
-			Logger: config.Logger,
-			Stderr: config.Stderr,
-			Stdout: config.Stdout,
-		}
-
-		alertCmd, err = alert.New(c)
-		if err != nil {
-			return nil, microerror.Mask(err)
-		}
-	}
-
-	var shiftCmd *cobra.Command
-	{
-		c := shift.Config{
-			Logger: config.Logger,
-			Stderr: config.Stderr,
-			Stdout: config.Stdout,
-		}
-
-		shiftCmd, err = shift.New(c)
-		if err != nil {
-			return nil, microerror.Mask(err)
-		}
-	}
-
 	f := &flag{}
 
 	r := &runner{
@@ -80,9 +48,6 @@ func New(config Config) (*cobra.Command, error) {
 	}
 
 	f.Init(c)
-
-	c.AddCommand(alertCmd)
-	c.AddCommand(shiftCmd)
 
 	return c, nil
 }
