@@ -74,7 +74,7 @@ func Test_CalculatePercentageChange(t *testing.T) {
 			name:           "case 1: 0 change to 1",
 			input_a:        0,
 			input_b:        1,
-			expectedOutput: 0,
+			expectedOutput: 100,
 		},
 		{
 			name:           "case 2: 1 change to 0",

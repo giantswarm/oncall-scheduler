@@ -66,12 +66,12 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 		}
 	}
 
-	summary, err := opsgenie.GetAlertSummary()
+	summary, err := opsgenie.GetSummary()
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
-	err = slack.PostAlertSummary(summary)
+	err = slack.PostSummary(summary)
 	if err != nil {
 		return microerror.Mask(err)
 	}
