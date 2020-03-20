@@ -32,8 +32,13 @@ type AlertSummary []AlertSummaryItem
 type AlertSummaryItem struct {
 	CurrentCount  Count
 	PreviousCount Count
-	Change        Count
+	Change        Change
 	Display       string
+}
+
+type Change struct {
+	Diff       Count
+	Percentage Count
 }
 
 type Count struct {
@@ -126,7 +131,7 @@ func (c *Client) GetAlertSummary(team string, periods []Period) (AlertSummary, e
 	for _, period := range periods {
 		var currentCount Count
 		var previousCount Count
-		var change Count
+		var change Change
 
 		currentQueryBusinessHours := fmt.Sprintf(
 			queryFormatBusinessHours,
@@ -164,9 +169,9 @@ func (c *Client) GetAlertSummary(team string, periods []Period) (AlertSummary, e
 
 		previousCount.Total = previousCount.BusinessHours + previousCount.NonBusinessHours
 
-		change.BusinessHours = c.calculatePercentageChange(previousCount.BusinessHours, currentCount.BusinessHours)
-		change.NonBusinessHours = c.calculatePercentageChange(previousCount.NonBusinessHours, currentCount.NonBusinessHours)
-		change.Total = c.calculatePercentageChange(previousCount.Total, currentCount.Total)
+		change.Diff.BusinessHours, change.Percentage.BusinessHours = c.calculateChange(previousCount.BusinessHours, currentCount.BusinessHours)
+		change.Diff.NonBusinessHours, change.Percentage.NonBusinessHours = c.calculateChange(previousCount.NonBusinessHours, currentCount.NonBusinessHours)
+		change.Diff.Total, change.Percentage.Total = c.calculateChange(previousCount.Total, currentCount.Total)
 
 		summaryItem := AlertSummaryItem{
 			CurrentCount:  currentCount,
@@ -223,19 +228,25 @@ func (c *Client) getUnixTime(when time.Time, dayShift int) int64 {
 	return when.AddDate(0, 0, -dayShift).UnixNano() / int64(time.Millisecond)
 }
 
-func (c *Client) calculatePercentageChange(a, b int) int {
+func (c *Client) calculateChange(a, b int) (int, int) {
+	var diff, percentage int
+
 	if a == 0 && b == 0 {
-		return 0
+		return 0, 0
 	}
 	if a == 0 && b > 0 {
-		return 100
+		return b, 100
 	}
 
 	if a < b {
-		return int((float64(b-a) / float64(a)) * 100)
+		diff = int(b - a)
+		percentage = int((float64(b-a) / float64(a)) * 100)
 	} else {
-		return -int((float64(a-b) / float64(a)) * 100)
+		diff = -int(a - b)
+		percentage = -int((float64(a-b) / float64(a)) * 100)
 	}
+
+	return diff, percentage
 }
 
 func (c *Client) contains(a []string, b string) bool {
