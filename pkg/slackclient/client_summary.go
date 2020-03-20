@@ -2,7 +2,6 @@ package slackclient
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 
@@ -45,22 +44,20 @@ func (c *Client) buildAlertSummaryAttachment(team string, summaryItem opsgeniecl
 
 	t := ""
 	for _, item := range summaryItem {
-		absChange := int(math.Abs(float64(item.Change)))
+		totalDiff := diff(item.CurrentCount.Total, item.PreviousCount.Total)
+		total := fmt.Sprintf("total: %v (%v|%v%%)", item.CurrentCount.Total, totalDiff, item.Change.Total)
+		businessHoursDiff := diff(item.CurrentCount.BusinessHours, item.PreviousCount.BusinessHours)
+		businessHours := fmt.Sprintf("bh: %v (%v|%v%%)", item.CurrentCount.BusinessHours, businessHoursDiff, item.Change.BusinessHours)
+		nonBusinessHoursDiff := diff(item.CurrentCount.NonBusinessHours, item.PreviousCount.NonBusinessHours)
+		nonBusinessHours := fmt.Sprintf("nbh: %v (%v|%v%%)", item.CurrentCount.NonBusinessHours, nonBusinessHoursDiff, item.Change.NonBusinessHours)
 
-		switch change := item.Change; {
-		case change < 0:
-			t = t + fmt.Sprintf("%v alerts over the last %v (%v fewer alerts, decrease of %v%%)\n", item.Count, item.Display, item.PreviousCount-item.Count, absChange)
-		case change == 0:
-			t = t + fmt.Sprintf("%v alerts over the last %v, same as previous\n", item.Count, item.Display)
-		default:
-			t = t + fmt.Sprintf("%v alerts over the last %v (%v more alerts, increase of %v%%)\n", item.Count, item.Display, item.Count-item.PreviousCount, absChange)
-		}
+		t = t + fmt.Sprintf("Last %v: %s | %s | %s. \n", item.Display, total, businessHours, nonBusinessHours)
 	}
 
 	color := ""
 	numGoods := 0
 	for _, item := range summaryItem {
-		if item.Change <= 0 {
+		if item.Change.Total <= 0 {
 			numGoods++
 		}
 	}
@@ -92,4 +89,19 @@ func (c *Client) formatTeamName(name string) string {
 	name = strings.Title(name)
 
 	return name
+}
+
+func diff(num1, num2 int) string {
+	var diff string
+
+	switch change := num1 - num2; {
+	case change < 0:
+		diff = fmt.Sprintf("-%d", num2-num1)
+	case change == 0:
+		diff = "0"
+	default:
+		diff = fmt.Sprintf("+%d", num1-num2)
+	}
+
+	return diff
 }

@@ -13,14 +13,15 @@ const (
 	OpsGenieAPICountUrl = "https://api.opsgenie.com/v2/alerts/count"
 	OpsGenieAPITeamUrl  = "https://api.opsgenie.com/v2/teams"
 
-	queryFormat = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v"
+	queryFormatBusinessHours    = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v AND NOT teams: ops_team"
+	queryFormatNonBusinessHours = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v AND teams: ops_team"
 )
 
 var (
 	blocklist = []string{
-		"alerts_router_team",
 		"se",
 		"sre_team",
+		"ops_team",
 	}
 )
 
@@ -29,10 +30,16 @@ type Summary map[string]AlertSummary
 type AlertSummary []AlertSummaryItem
 
 type AlertSummaryItem struct {
-	Count         int
-	PreviousCount int
-	Change        int
+	CurrentCount  Count
+	PreviousCount Count
+	Change        Count
 	Display       string
+}
+
+type Count struct {
+	BusinessHours    int
+	NonBusinessHours int
+	Total            int
 }
 
 type Period struct {
@@ -117,29 +124,52 @@ func (c *Client) GetAlertSummary(team string, periods []Period) (AlertSummary, e
 	alertSummary := AlertSummary{}
 
 	for _, period := range periods {
-		var count int
-		var previousCount int
+		var currentCount Count
+		var previousCount Count
+		var change Count
 
-		currentQuery := fmt.Sprintf(
-			queryFormat,
+		currentQueryBusinessHours := fmt.Sprintf(
+			queryFormatBusinessHours,
 			c.getUnixTime(time.Now(), 0),
 			c.getUnixTime(time.Now(), period.NumDays),
 			team,
 		)
-		count, _ = c.CountAlerts(currentQuery)
+		currentCount.BusinessHours, _ = c.CountAlerts(currentQueryBusinessHours)
 
-		previousQuery := fmt.Sprintf(
-			queryFormat,
+		currentNonBusinessHours := fmt.Sprintf(
+			queryFormatNonBusinessHours,
+			c.getUnixTime(time.Now(), 0),
+			c.getUnixTime(time.Now(), period.NumDays),
+			team,
+		)
+		currentCount.NonBusinessHours, _ = c.CountAlerts(currentNonBusinessHours)
+
+		currentCount.Total = currentCount.BusinessHours + currentCount.NonBusinessHours
+
+		previousQueryBusinessHours := fmt.Sprintf(
+			queryFormatBusinessHours,
 			c.getUnixTime(time.Now(), period.NumDays),
 			c.getUnixTime(time.Now(), period.NumDays*2),
 			team,
 		)
-		previousCount, _ = c.CountAlerts(previousQuery)
+		previousCount.BusinessHours, _ = c.CountAlerts(previousQueryBusinessHours)
 
-		change := c.calculatePercentageChange(previousCount, count)
+		previousNonBusinessHours := fmt.Sprintf(
+			queryFormatNonBusinessHours,
+			c.getUnixTime(time.Now(), period.NumDays),
+			c.getUnixTime(time.Now(), period.NumDays*2),
+			team,
+		)
+		previousCount.NonBusinessHours, _ = c.CountAlerts(previousNonBusinessHours)
+
+		previousCount.Total = previousCount.BusinessHours + previousCount.NonBusinessHours
+
+		change.BusinessHours = c.calculatePercentageChange(previousCount.BusinessHours, currentCount.BusinessHours)
+		change.NonBusinessHours = c.calculatePercentageChange(previousCount.NonBusinessHours, currentCount.NonBusinessHours)
+		change.Total = c.calculatePercentageChange(previousCount.Total, currentCount.Total)
 
 		summaryItem := AlertSummaryItem{
-			Count:         count,
+			CurrentCount:  currentCount,
 			PreviousCount: previousCount,
 			Change:        change,
 			Display:       period.Display,
