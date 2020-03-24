@@ -54,7 +54,7 @@ func Test_GetUnixTime(t *testing.T) {
 	}
 }
 
-func Test_CalculatePercentageChange(t *testing.T) {
+func Test_CalculateChange(t *testing.T) {
 	testCases := []struct {
 		name           string
 		input_a        int
@@ -106,7 +106,7 @@ func Test_CalculatePercentageChange(t *testing.T) {
 				t.Fatalf("could not create client: %#v", err)
 			}
 
-			output := client.calculatePercentageChange(tc.input_a, tc.input_b)
+			_, output := client.calculateChange(tc.input_a, tc.input_b)
 
 			if output != tc.expectedOutput {
 				t.Fatalf("wanted: %v, got: %v", tc.expectedOutput, output)

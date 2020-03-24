@@ -13,14 +13,15 @@ const (
 	OpsGenieAPICountUrl = "https://api.opsgenie.com/v2/alerts/count"
 	OpsGenieAPITeamUrl  = "https://api.opsgenie.com/v2/teams"
 
-	queryFormat = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v"
+	queryFormatBusinessHours    = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v AND NOT teams: ops_team"
+	queryFormatNonBusinessHours = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v AND teams: ops_team"
 )
 
 var (
 	blocklist = []string{
-		"alerts_router_team",
 		"se",
 		"sre_team",
+		"ops_team",
 	}
 )
 
@@ -29,10 +30,21 @@ type Summary map[string]AlertSummary
 type AlertSummary []AlertSummaryItem
 
 type AlertSummaryItem struct {
-	Count         int
-	PreviousCount int
-	Change        int
+	CurrentCount  Count
+	PreviousCount Count
+	Change        Change
 	Display       string
+}
+
+type Change struct {
+	Diff       Count
+	Percentage Count
+}
+
+type Count struct {
+	BusinessHours    int
+	NonBusinessHours int
+	Total            int
 }
 
 type Period struct {
@@ -117,29 +129,52 @@ func (c *Client) GetAlertSummary(team string, periods []Period) (AlertSummary, e
 	alertSummary := AlertSummary{}
 
 	for _, period := range periods {
-		var count int
-		var previousCount int
+		var currentCount Count
+		var previousCount Count
+		var change Change
 
-		currentQuery := fmt.Sprintf(
-			queryFormat,
+		currentQueryBusinessHours := fmt.Sprintf(
+			queryFormatBusinessHours,
 			c.getUnixTime(time.Now(), 0),
 			c.getUnixTime(time.Now(), period.NumDays),
 			team,
 		)
-		count, _ = c.CountAlerts(currentQuery)
+		currentCount.BusinessHours, _ = c.CountAlerts(currentQueryBusinessHours)
 
-		previousQuery := fmt.Sprintf(
-			queryFormat,
+		currentNonBusinessHours := fmt.Sprintf(
+			queryFormatNonBusinessHours,
+			c.getUnixTime(time.Now(), 0),
+			c.getUnixTime(time.Now(), period.NumDays),
+			team,
+		)
+		currentCount.NonBusinessHours, _ = c.CountAlerts(currentNonBusinessHours)
+
+		currentCount.Total = currentCount.BusinessHours + currentCount.NonBusinessHours
+
+		previousQueryBusinessHours := fmt.Sprintf(
+			queryFormatBusinessHours,
 			c.getUnixTime(time.Now(), period.NumDays),
 			c.getUnixTime(time.Now(), period.NumDays*2),
 			team,
 		)
-		previousCount, _ = c.CountAlerts(previousQuery)
+		previousCount.BusinessHours, _ = c.CountAlerts(previousQueryBusinessHours)
 
-		change := c.calculatePercentageChange(previousCount, count)
+		previousNonBusinessHours := fmt.Sprintf(
+			queryFormatNonBusinessHours,
+			c.getUnixTime(time.Now(), period.NumDays),
+			c.getUnixTime(time.Now(), period.NumDays*2),
+			team,
+		)
+		previousCount.NonBusinessHours, _ = c.CountAlerts(previousNonBusinessHours)
+
+		previousCount.Total = previousCount.BusinessHours + previousCount.NonBusinessHours
+
+		change.Diff.BusinessHours, change.Percentage.BusinessHours = c.calculateChange(previousCount.BusinessHours, currentCount.BusinessHours)
+		change.Diff.NonBusinessHours, change.Percentage.NonBusinessHours = c.calculateChange(previousCount.NonBusinessHours, currentCount.NonBusinessHours)
+		change.Diff.Total, change.Percentage.Total = c.calculateChange(previousCount.Total, currentCount.Total)
 
 		summaryItem := AlertSummaryItem{
-			Count:         count,
+			CurrentCount:  currentCount,
 			PreviousCount: previousCount,
 			Change:        change,
 			Display:       period.Display,
@@ -193,19 +228,25 @@ func (c *Client) getUnixTime(when time.Time, dayShift int) int64 {
 	return when.AddDate(0, 0, -dayShift).UnixNano() / int64(time.Millisecond)
 }
 
-func (c *Client) calculatePercentageChange(a, b int) int {
+func (c *Client) calculateChange(a, b int) (int, int) {
+	var diff, percentage int
+
 	if a == 0 && b == 0 {
-		return 0
+		return 0, 0
 	}
 	if a == 0 && b > 0 {
-		return 100
+		return b, 100
 	}
 
 	if a < b {
-		return int((float64(b-a) / float64(a)) * 100)
+		diff = int(b - a)
+		percentage = int((float64(b-a) / float64(a)) * 100)
 	} else {
-		return -int((float64(a-b) / float64(a)) * 100)
+		diff = -int(a - b)
+		percentage = -int((float64(a-b) / float64(a)) * 100)
 	}
+
+	return diff, percentage
 }
 
 func (c *Client) contains(a []string, b string) bool {

@@ -13,7 +13,7 @@ const (
 
 const (
 	defaultOpsGenieAPIKey = ""
-	defaultSlackChannel   = "test_bot" // TODO: Change to #ops.
+	defaultSlackChannel   = "ops"
 	defaultSlackToken     = ""
 )
 

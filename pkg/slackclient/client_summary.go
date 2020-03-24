@@ -2,7 +2,6 @@ package slackclient
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 
@@ -45,22 +44,17 @@ func (c *Client) buildAlertSummaryAttachment(team string, summaryItem opsgeniecl
 
 	t := ""
 	for _, item := range summaryItem {
-		absChange := int(math.Abs(float64(item.Change)))
+		total := fmt.Sprintf("total: *%v* (%v|%v%%)", item.CurrentCount.Total, item.Change.Diff.Total, item.Change.Percentage.Total)
+		businessHours := fmt.Sprintf("bh: *%v* (%v|%v%%)", item.CurrentCount.BusinessHours, item.Change.Diff.BusinessHours, item.Change.Percentage.BusinessHours)
+		nonBusinessHours := fmt.Sprintf("nbh: *%v* (%v|%v%%)", item.CurrentCount.NonBusinessHours, item.Change.Diff.NonBusinessHours, item.Change.Percentage.NonBusinessHours)
 
-		switch change := item.Change; {
-		case change < 0:
-			t = t + fmt.Sprintf("%v alerts over the last %v (%v fewer alerts, decrease of %v%%)\n", item.Count, item.Display, item.PreviousCount-item.Count, absChange)
-		case change == 0:
-			t = t + fmt.Sprintf("%v alerts over the last %v, same as previous\n", item.Count, item.Display)
-		default:
-			t = t + fmt.Sprintf("%v alerts over the last %v (%v more alerts, increase of %v%%)\n", item.Count, item.Display, item.Count-item.PreviousCount, absChange)
-		}
+		t = t + fmt.Sprintf("Last %v: %s | %s | %s. \n", item.Display, total, businessHours, nonBusinessHours)
 	}
 
 	color := ""
 	numGoods := 0
 	for _, item := range summaryItem {
-		if item.Change <= 0 {
+		if item.Change.Diff.Total <= 0 {
 			numGoods++
 		}
 	}
