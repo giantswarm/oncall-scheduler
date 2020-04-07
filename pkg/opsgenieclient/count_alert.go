@@ -10,86 +10,11 @@ import (
 )
 
 const (
-	OpsGenieAPICountUrl = "https://api.opsgenie.com/v2/alerts/count"
-	OpsGenieAPITeamUrl  = "https://api.opsgenie.com/v2/teams"
+	OpsGenieAPIAlertsCountUrl = "https://api.opsgenie.com/v2/alerts/count"
 
 	queryFormatBusinessHours    = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v AND NOT teams: ops_team"
 	queryFormatNonBusinessHours = "createdAt < %v AND createdAt > %v AND (tag: stable or [Pingdom]) AND teams: %v AND teams: ops_team"
 )
-
-var (
-	blocklist = []string{
-		"se",
-		"sre_team",
-		"ops_team",
-	}
-)
-
-type Summary map[string]AlertSummary
-
-type AlertSummary []AlertSummaryItem
-
-type AlertSummaryItem struct {
-	CurrentCount  Count
-	PreviousCount Count
-	Change        Change
-	Display       string
-}
-
-type Change struct {
-	Diff       Count
-	Percentage Count
-}
-
-type Count struct {
-	BusinessHours    int
-	NonBusinessHours int
-	Total            int
-}
-
-type Period struct {
-	NumDays int
-	Display string
-}
-
-func (c *Client) GetTeams() ([]string, error) {
-	type OpsgenieTeamResponseData struct {
-		Name string `json:name`
-	}
-
-	type OpsgenieTeamResponse struct {
-		Data []OpsgenieTeamResponseData `json:"data"`
-	}
-
-	req, err := http.NewRequest(http.MethodGet, OpsGenieAPITeamUrl, nil)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("GenieKey %v", c.apiKey))
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-	defer resp.Body.Close()
-
-	opsgenieResponse := &OpsgenieTeamResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(opsgenieResponse); err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	teamNames := []string{}
-	for _, team := range opsgenieResponse.Data {
-		if c.contains(blocklist, team.Name) {
-			continue
-		}
-
-		teamNames = append(teamNames, team.Name)
-	}
-
-	return teamNames, nil
-}
 
 func (c *Client) CountAlerts(query string) (int, error) {
 	type OpsgenieCountResponseData struct {
@@ -100,7 +25,7 @@ func (c *Client) CountAlerts(query string) (int, error) {
 		Data OpsgenieCountResponseData `json:"data"`
 	}
 
-	req, err := http.NewRequest(http.MethodGet, OpsGenieAPICountUrl, nil)
+	req, err := http.NewRequest(http.MethodGet, OpsGenieAPIAlertsCountUrl, nil)
 	if err != nil {
 		return 0, microerror.Mask(err)
 	}
@@ -125,8 +50,8 @@ func (c *Client) CountAlerts(query string) (int, error) {
 	return opsgenieResponse.Data.Count, nil
 }
 
-func (c *Client) GetAlertSummary(team string, periods []Period) (AlertSummary, error) {
-	alertSummary := AlertSummary{}
+func (c *Client) GetAlertCountSummary(team string, periods []Period) (AlertCountSummary, error) {
+	alertSummary := AlertCountSummary{}
 
 	for _, period := range periods {
 		var currentCount Count
@@ -173,7 +98,7 @@ func (c *Client) GetAlertSummary(team string, periods []Period) (AlertSummary, e
 		change.Diff.NonBusinessHours, change.Percentage.NonBusinessHours = c.calculateChange(previousCount.NonBusinessHours, currentCount.NonBusinessHours)
 		change.Diff.Total, change.Percentage.Total = c.calculateChange(previousCount.Total, currentCount.Total)
 
-		summaryItem := AlertSummaryItem{
+		summaryItem := AlertCountSummaryItem{
 			CurrentCount:  currentCount,
 			PreviousCount: previousCount,
 			Change:        change,
@@ -187,8 +112,9 @@ func (c *Client) GetAlertSummary(team string, periods []Period) (AlertSummary, e
 
 }
 
-func (c *Client) GetSummary() (Summary, error) {
-	teams, err := c.GetTeams()
+func (c *Client) GetCountSummary() (CountSummary, error) {
+	excludeAlertsRouterTeam := false
+	teams, err := c.GetTeams(excludeAlertsRouterTeam)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
@@ -208,10 +134,10 @@ func (c *Client) GetSummary() (Summary, error) {
 		},
 	}
 
-	summary := Summary{}
+	summary := CountSummary{}
 
 	for _, team := range teams {
-		alertSummary, err := c.GetAlertSummary(team, periods)
+		alertSummary, err := c.GetAlertCountSummary(team, periods)
 		if err != nil {
 			return nil, microerror.Mask(err)
 		}

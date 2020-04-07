@@ -10,7 +10,7 @@ import (
 	"github.com/nlopes/slack"
 )
 
-func (c *Client) PostSummary(summary opsgenieclient.Summary) error {
+func (c *Client) PostCountSummary(summary opsgenieclient.CountSummary) (string, error) {
 	teamNames := []string{}
 	for teamName := range summary {
 		teamNames = append(teamNames, teamName)
@@ -22,24 +22,24 @@ func (c *Client) PostSummary(summary opsgenieclient.Summary) error {
 	for _, teamName := range teamNames {
 		alertSummary := summary[teamName]
 
-		attachment := c.buildAlertSummaryAttachment(teamName, alertSummary)
+		attachment := c.buildAlertCountSummaryAttachment(teamName, alertSummary)
 		attachments = append(attachments, attachment)
 	}
 
-	_, _, err := c.client.PostMessage(
+	_, ts, err := c.client.PostMessage(
 		c.channel,
 		slack.MsgOptionAsUser(true),
-		slack.MsgOptionText("Today's OpsGenie Alert Summary!", false),
+		slack.MsgOptionText("Today's OpsGenie Alert Summary! Check the thread for details.", false),
 		slack.MsgOptionAttachments(attachments...),
 	)
 	if err != nil {
-		return microerror.Mask(err)
+		return "", microerror.Mask(err)
 	}
 
-	return nil
+	return ts, nil
 }
 
-func (c *Client) buildAlertSummaryAttachment(team string, summaryItem opsgenieclient.AlertSummary) slack.Attachment {
+func (c *Client) buildAlertCountSummaryAttachment(team string, summaryItem opsgenieclient.AlertCountSummary) slack.Attachment {
 	name := c.formatTeamName(team)
 
 	t := ""
