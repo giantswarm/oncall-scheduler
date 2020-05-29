@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/giantswarm/microerror"
 )
@@ -12,14 +13,7 @@ const (
 	OpsGenieAPITeamUrl = "https://api.opsgenie.com/v2/teams"
 
 	alertsRouterTeam = "alerts_router_team"
-)
-
-var (
-	blocklist = []string{
-		"se",
-		"sre_team",
-		"ops_team",
-	}
+	blocklist_regex  = "(^se.*)|(sre_team)|(ops_team)"
 )
 
 func (c *Client) GetTeams(excludeAlertsRouterTeam bool) ([]string, error) {
@@ -50,8 +44,9 @@ func (c *Client) GetTeams(excludeAlertsRouterTeam bool) ([]string, error) {
 	}
 
 	teamNames := []string{}
+	regex := regexp.MustCompile(blocklist_regex)
 	for _, team := range opsgenieResponse.Data {
-		if c.contains(blocklist, team.Name) {
+		if !regex.Match([]byte(team.Name)) {
 			continue
 		}
 
