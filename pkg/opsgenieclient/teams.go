@@ -46,7 +46,7 @@ func (c *Client) GetTeams(excludeAlertsRouterTeam bool) ([]string, error) {
 	teamNames := []string{}
 	regex := regexp.MustCompile(blocklist_regex)
 	for _, team := range opsgenieResponse.Data {
-		if !regex.Match([]byte(team.Name)) {
+		if regex.Match([]byte(team.Name)) {
 			continue
 		}
 
