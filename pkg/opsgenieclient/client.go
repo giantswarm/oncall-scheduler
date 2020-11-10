@@ -31,7 +31,7 @@ func New(config Config) (*Client, error) {
 	}
 
 	httpClient := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 10 * time.Second,
 	}
 
 	c := &Client{
