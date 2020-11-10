@@ -26,12 +26,16 @@ func New(config Config) (*Client, error) {
 		return nil, microerror.Maskf(invalidConfigError, "%T.Logger must not be empty", config)
 	}
 
+	if config.Logger == nil {
+		return nil, microerror.Maskf(invalidConfigError, "%T.Logger must not be empty", config)
+	}
+
 	if config.APIKey == "" {
 		return nil, microerror.Maskf(invalidConfigError, "%T.APIKey must not be empty", config)
 	}
 
 	httpClient := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 10 * time.Second,
 	}
 
 	c := &Client{
